@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>토마토 키우기 & 심사</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin: 40px;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    #controls {
+      margin-bottom: 20px;
+    }
+
+    button {
+    margin: 0 10px;
+    padding: 10px 20px;
+    background-color: #ddd;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    border-radius: 6px;
+    }   
+
+    button:hover {
+      transform: scale(1.05);
+    }
+
+    button.active {
+      background-color: #ff6b6b;
+      color: white;
+    }
+
+    canvas {
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+
+    .section-divider {
+      margin: 60px 0 20px;
+      border-top: 1px solid #aaa;
+    }
+
+    .container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 30px;
+      margin-top: 30px;
+    }
+
+    .box {
+      width: 200px;
+      height: 400px;
+      background-color: #111;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      border-radius: 8px;
+    }
+
+    .box img {
+      width: 100px;
+      margin: 10px 0;
+      cursor: grab;
+    }
+
+    .drop-target {
+      width: 400px;
+      height: 400px;
+      background-color: #111;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #result {
+      margin-top: 40px;
+      background: #ddd;
+      padding: 20px;
+      font-size: 16px;
+      width: 70%;
+      margin-left: auto;
+      margin-right: auto;
+      border-radius: 5px;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>나만의 영양가 있는 농산물을 키워보세요!</h2>
+  <p>버튼 선택 후 드래그</p>
+
+  <div id="controls">
+    <button data-mode="liquify">무농약 재배</button>
+    <button data-mode="colorize">유기농 재배</button>
+    <button data-mode="erase">농약 재배</button>
+  </div>
+
+  <canvas id="tomatoCanvas" width="500" height="500"></canvas>
+
+  <div class="section-divider"></div>
+
+  <h2>판매를 위해 심사를 받아보세요!</h2>
+
+  <div class="container">
+    <div class="box" id="drag-source">
+      <img src="tomato.png" draggable="true" data-result="중결점 : 형성장애 농산물 표준 규격에 적합하지 않아 판매가 불가능합니다.">
+      <img src="tomato.png" draggable="true" data-result="중결점 : 착색불량 색이 일정하지 않아 등외 판정입니다.">
+      <img src="tomato.png" draggable="true" data-result="적합 : 상품 농산물 표준 규격에 적합하여 판매가 가능합니다.">
+    </div>
+
+    <div class="drop-target" id="drop-target">
+      <p style="color: #aaa;">여기로 드래그</p>
+    </div>
+  </div>
+
+  <div id="result">
+    토마토를 심사대에 올려 확인해보세요.
+  </div>
+
+  <script>
+    const canvas = document.getElementById('tomatoCanvas');
+    const ctx = canvas.getContext('2d');
+    let mode = 'liquify';
+    let isDrawing = false;
+    let originalData;
+    let lastX = null, lastY = null;
+
+    const tomato = new Image();
+    tomato.crossOrigin = "anonymous";
+    tomato.src = 'tomato.png';
+    tomato.onload = () => {
+      ctx.drawImage(tomato, 0, 0, canvas.width, canvas.height);
+      originalData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    };
+
+    document.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        mode = btn.dataset.mode;
+
+    document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+
+    btn.classList.add('active');
+      });
+    });
+
+    canvas.addEventListener('mousedown', e => {
+      isDrawing = true;
+      const rect = canvas.getBoundingClientRect();
+      lastX = e.clientX - rect.left;
+      lastY = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener('mouseup', () => isDrawing = false);
+    canvas.addEventListener('mouseleave', () => isDrawing = false);
+
+    canvas.addEventListener('mousemove', e => {
+      if (!isDrawing) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      if (mode === 'liquify') {
+        liquifyEffect(lastX, lastY, x - lastX, y - lastY);
+      } else if (mode === 'colorize') {
+        yellowTint(x, y);
+      } else if (mode === 'erase') {
+        eraseEffect(x, y);
+      }
+
+      lastX = x;
+      lastY = y;
+    });
+
+    function liquifyEffect(x, y, dx, dy) {
+      const radius = 20;
+      const src = ctx.getImageData(x - radius, y - radius, radius * 2, radius * 2);
+      ctx.clearRect(x - radius, y - radius, radius * 2, radius * 2);
+      ctx.putImageData(src, x - radius + dx, y - radius + dy);
+    }
+
+    function yellowTint(x, y) {
+      const radius = 20;
+      const imgData = ctx.getImageData(x - radius, y - radius, radius * 2, radius * 2);
+      for (let i = 0; i < imgData.data.length; i += 4) {
+        imgData.data[i] = Math.min(255, imgData.data[i] + 30);     // R
+        imgData.data[i + 1] = Math.min(255, imgData.data[i + 1] + 30); // G
+      }
+      ctx.putImageData(imgData, x - radius, y - radius);
+    }
+
+    function eraseEffect(x, y) {
+      const radius = 20;
+      const startX = Math.max(0, x - radius);
+      const startY = Math.max(0, y - radius);
+      const width = radius * 2;
+      const height = radius * 2;
+
+      const restore = ctx.createImageData(width, height);
+      for (let i = 0; i < restore.data.length; i += 4) {
+        const px = i / 4 % width;
+        const py = Math.floor(i / 4 / width);
+        const index = ((startY + py) * canvas.width + (startX + px)) * 4;
+
+        if (index + 3 < originalData.data.length) {
+          restore.data[i] = originalData.data[index];
+          restore.data[i + 1] = originalData.data[index + 1];
+          restore.data[i + 2] = originalData.data[index + 2];
+          restore.data[i + 3] = originalData.data[index + 3];
+        }
+      }
+      ctx.putImageData(restore, startX, startY);
+    }
+
+    const draggables = document.querySelectorAll('#drag-source img');
+    const dropTarget = document.getElementById('drop-target');
+    const resultBox = document.getElementById('result');
+
+    draggables.forEach(item => {
+      item.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', item.dataset.result);
+        e.dataTransfer.setDragImage(item, 50, 50);
+      });
+    });
+
+    dropTarget.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropTarget.style.borderColor = '#00cc66';
+    });
+
+    dropTarget.addEventListener('dragleave', () => {
+      dropTarget.style.borderColor = '#aaa';
+    });
+
+    dropTarget.addEventListener('drop', e => {
+      e.preventDefault();
+      dropTarget.style.borderColor = '#aaa';
+
+      const result = e.dataTransfer.getData('text/plain');
+      resultBox.innerText = result;
+
+      dropTarget.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = 'tomato.png';
+      img.style.width = '330px';
+      img.style.height = 'auto';
+      dropTarget.appendChild(img);
+    });
+  </script>
+</body>
+</html>
